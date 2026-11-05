@@ -6,27 +6,48 @@ var choice = '1';
 var screenbg = 250;
 var lastscreenshot = 61;
 
-let button;
+let saveButton;
+let clearButton;
+let helpButton;
+let eraserButton;
+let undoButton;
+let fileInput;
+
+let importedImage;
+let eraserMode = false;
+let history = [];
 
 function preload() {
-  img = loadImage('https://arao-sjsu.github.io/images/cat.jpg');
+  img = loadImage('hollygpt2.jpg');
 }
 
 function setup() {
   createCanvas(600, 600);
   background(screenbg);
 
-  button = createButton('clear canvas');
-  button.position(500, 645);
-  button.mousePressed(clear_print);
+  // Buttons placed on the right side of the canvas
+  saveButton = createButton('save img');
+  saveButton.position(620, 100);
+  saveButton.mousePressed(saveme);
 
-  button = createButton('save img');
-  button.position(500, 620);
-  button.mousePressed(saveme);
+  clearButton = createButton('clear canvas');
+  clearButton.position(620, 140);
+  clearButton.mousePressed(clear_print);
 
-  button = createButton('help text');
-  button.position(500, 670);
-  button.mousePressed(helpText);
+  helpButton = createButton('help text');
+  helpButton.position(620, 180);
+  helpButton.mousePressed(helpText);
+
+  eraserButton = createButton('eraser: off');
+  eraserButton.position(620, 220);
+  eraserButton.mousePressed(toggleEraser);
+
+  undoButton = createButton('undo');
+  undoButton.position(620, 260);
+  undoButton.mousePressed(undoCanvas);
+
+  fileInput = createFileInput(handleFile);
+  fileInput.position(620, 310);
 
   helpText();
 }
@@ -36,13 +57,34 @@ function draw() {
     choice = key;
   }
 
-  if (mouseIsPressed) {
-    newkeyChoice(choice);
+  if (
+    mouseIsPressed &&
+    mouseX >= 0 &&
+    mouseX <= width &&
+    mouseY >= 0 &&
+    mouseY <= height
+  ) {
+    if (eraserMode) {
+      eraserBrush();
+    } else {
+      newkeyChoice(choice);
+    }
+  }
+}
+
+function mousePressed() {
+  // Save the canvas before drawing so it can be undone
+  if (
+    mouseX >= 0 &&
+    mouseX <= width &&
+    mouseY >= 0 &&
+    mouseY <= height
+  ) {
+    saveCanvasState();
   }
 }
 
 function newkeyChoice(toolChoice) {
-
   if (toolChoice == '1') {
     // Very thin black brush
     stroke(0);
@@ -153,10 +195,49 @@ function newkeyChoice(toolChoice) {
     endShape(CLOSE);
 
     pop();
+
+  } else if (toolChoice == 'g' || toolChoice == 'G') {
+    // Secret bonus image brush
+    image(img, mouseX, mouseY, mouseX / 10, mouseX / 16);
+  }
+}
+
+function eraserBrush() {
+  stroke(screenbg);
+  strokeWeight(35);
+  line(mouseX, mouseY, pmouseX, pmouseY);
+}
+
+function toggleEraser() {
+  eraserMode = !eraserMode;
+
+  if (eraserMode) {
+    eraserButton.html('eraser: on');
+  } else {
+    eraserButton.html('eraser: off');
+  }
+}
+
+function saveCanvasState() {
+  history.push(get());
+
+  // Keeps the undo history from becoming too large
+  if (history.length > 20) {
+    history.shift();
+  }
+}
+
+function undoCanvas() {
+  if (history.length > 0) {
+    let previousCanvas = history.pop();
+
+    imageMode(CORNER);
+    image(previousCanvas, 0, 0);
   }
 }
 
 function clear_print() {
+  saveCanvasState();
   background(screenbg);
 }
 
@@ -165,7 +246,6 @@ function saveme() {
 
   if (second() != lastscreenshot) {
     saveCanvas(filename, 'jpg');
-    key = '';
   }
 
   lastscreenshot = second();
@@ -185,6 +265,19 @@ function helpText() {
   textSize(15);
 
   text('Press numerical keys from 1 - 0 for different brushes', 60, 30);
-  text('Use buttons to save or clear the canvas, or press X or P', 60, 45);
+  text('Use the buttons on the right to control the canvas', 60, 45);
   text('Try G for a secret bonus', 60, 60);
+}
+
+function handleFile(file) {
+  if (file.type === 'image') {
+    saveCanvasState();
+
+    loadImage(file.data, function(loadedImage) {
+      importedImage = loadedImage;
+
+      imageMode(CORNER);
+      image(importedImage, 0, 0, width, height);
+    });
+  }
 }
